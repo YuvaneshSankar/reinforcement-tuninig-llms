@@ -47,3 +47,6 @@ logs/
 .tox/
 .cache/
 .ropeproject/
+
+# Unsloth compiled cache outputs
+unsloth_compiled_cache/
