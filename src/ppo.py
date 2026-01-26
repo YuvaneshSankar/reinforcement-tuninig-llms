@@ -39,9 +39,7 @@ def ppo_training():
     base_model, tokenizer = load_model_and_tokenizer(2048, "unsloth/tinyllama-bnb-4bit")
     model = load_adapter(base_model, "./models/sft/checkpoint-6000")
 
-    # Reference model with frozen weights
-    ref_base, _ = load_model_and_tokenizer(2048, "unsloth/tinyllama-bnb-4bit")
-    ref_model = load_adapter(ref_base, "./models/sft/checkpoint-6000")
+    ref_model = load_adapter(base_model, "./models/sft/checkpoint-6000")
     ref_model.eval()
     for param in ref_model.parameters():
         param.requires_grad = False
@@ -50,13 +48,13 @@ def ppo_training():
         learning_rate=1e-5,
         batch_size=16,
         mini_batch_size=4,
-        ppo_epochs=4,
-        init_kl_coef=0.2,
+        num_ppo_epochs=4,
+        kl_coef=0.2,
         cliprange=0.2,
     )
 
     ppo_trainer = PPOTrainer(
-        config=ppo_config,
+        args=ppo_config,
         model=model,
         ref_model=ref_model,
         tokenizer=tokenizer
