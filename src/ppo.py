@@ -1,10 +1,13 @@
 import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoTokenizer
 from trl import PPOTrainer , PPOConfig
 from unsloth import FastLanguageModel
 from peft import PeftModel
-from rm import get_reward_score
 from torch.utils.data import DataLoader
 from datasets import load_dataset
+from trl import AutoModelForCausalLMWithValueHead
+
 
 
 dataset = load_dataset("tatsu-lab/alpaca", split="train")
@@ -18,6 +21,25 @@ dataloader = DataLoader(
     collate_fn=lambda x: x
 )
 
+
+
+def get_reward_score(question, answer):
+    reward_name = "OpenAssistant/reward-model-deberta-v3-large-v2"
+    rank_model = AutoModelForSequenceClassification.from_pretrained(reward_name)
+    tokenizer = AutoTokenizer.from_pretrained(reward_name)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    rank_model.to(device)
+    rank_model.eval()
+    text = f"{question}\n{answer}"
+
+    inputs = tokenizer(text, return_tensors='pt', truncation=True, max_length=512)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
+    with torch.no_grad():
+        score = rank_model(**inputs).logits[0].item()
+
+    return score
 
 def load_model_and_tokenizer(max_seq_length ,model_name):
   base_model,tokenizer=FastLanguageModel.from_pretrained(
@@ -37,29 +59,44 @@ def load_adapter(base_model, adapter_dir):
 
 def ppo_training():
     base_model, tokenizer = load_model_and_tokenizer(2048, "unsloth/tinyllama-bnb-4bit")
-    model = load_adapter(base_model, "./models/sft/checkpoint-6000")
 
-    ref_model = load_adapter(base_model, "./models/sft/checkpoint-6000")
-    ref_model.eval()
-    for param in ref_model.parameters():
-        param.requires_grad = False
+    #create value modle before laoding adapter
+    peft_model = load_adapter(base_model, "./models/sft/checkpoint-6000")
+    model=peft_model
+    value_model = AutoModelForCausalLMWithValueHead.from_pretrained(peft_model)
+
+    train_dataset = dataset.rename_column("instruction", "query")
+
+    #Dont need to do this by deafualt if ref_model in ppo trainer is not passed it takes the policy model and creates a copy for reference model
+
+    # ref_model = load_adapter(base_model, "./models/sft/checkpoint-6000")
+    # ref_model.eval()
+    # for param in ref_model.parameters():
+    #     param.requires_grad = False
 
     ppo_config = PPOConfig(
-        learning_rate=1e-5,
-        batch_size=16,
-        mini_batch_size=4,
-        num_ppo_epochs=4,
-        kl_coef=0.2,
-        cliprange=0.2,
+        kl_coef=0.05,
+        gamma=1, # discount factor
+        lam=0.95, # GAE lambda
+        cliprange_value=0.2, # clipping range for value function
+        vf_coef=0.1, # value function coefficient
     )
+
+    # ppo_trainer = PPOTrainer(
+    #     args=ppo_config,
+    #     model=model,
+    #     ref_model=ref_model,
+    #     tokenizer=tokenizer
+    # )
 
     ppo_trainer = PPOTrainer(
-        args=ppo_config,
+        config=ppo_config,  # Use 'config' instead of 'args'
         model=model,
-        ref_model=ref_model,
-        tokenizer=tokenizer
+        ref_model=None,
+        processing_class=tokenizer,
+        value_model=value_model,
+        train_dataset=train_dataset,
     )
-
 
     for epoch in range(3):
         for batch in dataloader:
@@ -82,8 +119,8 @@ def ppo_training():
             stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
 
             # Log every 10 steps
-            if ppo_trainer.current_step % 10 == 0:
-                print(f"Epoch {epoch}, Step {ppo_trainer.current_step}, Reward: {torch.stack(rewards).mean():.2f}")
+            if ppo_trainer.step_count % 10 == 0:
+                print(f"Epoch {epoch}, Step {ppo_trainer.step_count}, Reward: {torch.stack(rewards).mean():.2f}")
 
 
         model.save_pretrained(f"./models/ppo/epoch_{epoch}")
