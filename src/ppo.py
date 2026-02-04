@@ -1,14 +1,15 @@
 import unsloth
+# from vllm import LLM,SamplingParams
 from unsloth import FastLanguageModel
 # Patching must happen before other imports for some versions, though Unsloth handles this well now.
-from trl import PPOTrainer, PPOConfig,AutoModelForCausalLMWithValueHead
+from trl.trainer import PPOTrainer, PPOConfig,AutoModelForCausalLMWithValueHead
 from datasets import load_dataset
 from transformers import AutoModelForSequenceClassification
 import torch
 
 # 1. Setup Reward Model
 reward_name = "OpenAssistant/reward-model-deberta-v3-large-v2"
-reward_model = AutoModelForSequenceClassification.from_pretrained(reward_name)
+reward_model = AutoModelForSequenceClassification.from_pretrained(reward_name).to("cuda")
 
 def ppo_training():
     # 2. Load Model + SFT Adapters
@@ -27,14 +28,24 @@ def ppo_training():
     tokenizer.pad_token = tokenizer.eos_token
 
     # Enable gradients for training
-    FastLanguageModel.for_training(model)
+    FastLanguageModel.for_inference(model)
+    model = model.to("cuda")
     # 4. Prepare Dataset
     dataset = load_dataset("tatsu-lab/alpaca", split="train")
 
-    # Format the query
-    dataset = dataset.map(lambda example: {
-        "query": f"### Instruction {example['instruction']} \n### Input: {example['input']} \n### Response:"
-    }, batched=False)
+    #Format the query 
+    def format_query(example):
+        query = f"### Instruction:\n{example['instruction']}\n\n"
+
+        if example.get("input") and example["input"].strip():
+            query += f"### Input:\n{example['input']}\n\n"
+
+        query += "### Response:"
+
+        return {"query": query}
+
+    # Apply the formatting
+    dataset = dataset.map(format_query, batched=False)
 
     # Tokenize
     def tokenize_function(examples):
@@ -70,7 +81,7 @@ def ppo_training():
         model=model,
         ref_model=None,     # Unsloth handles ref_model efficiently internally
         processing_class=tokenizer,
-        value_model=None,
+        value_model=model,
         train_dataset=dataset,
         reward_model=reward_model,
     )
