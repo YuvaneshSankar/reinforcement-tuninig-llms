@@ -32,7 +32,7 @@ dataset = dataset.map(format_query, batched=False)
 
 trainer = GRPOTrainer(
     model=model,
-    args=GRPOConfig(use_vllm=True),
+    args=GRPOConfig(use_vllm=True,vllm_mode="colocate"),
     reward_funcs=reward_model,
     train_dataset=dataset,
 )
