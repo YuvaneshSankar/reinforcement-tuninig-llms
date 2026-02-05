@@ -34,7 +34,7 @@ def format_query(example):
 
     query += "### Response:"
 
-    return {"query": query}
+    return {"prompt": query}
 
 dataset = dataset.map(format_query, batched=False)
 
