@@ -1,38 +1,50 @@
 from datasets import load_dataset
 from trl import GRPOTrainer, GRPOConfig
 from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification
+from peft import PeftModel
 
+# Load base model and adapter
+base_model = AutoModelForCausalLM.from_pretrained(
+    "unsloth/tinyllama-bnb-4bit",
+    device_map="auto",
+    trust_remote_code=True
+)
 
-model = AutoModelForCausalLM.from_pretrained("./models/sft/checkpoint-6000")
+# Load your PEFT adapter checkpoint
+model = PeftModel.from_pretrained(
+    base_model,
+    "Yuvanesh123/grpo_test_checkpoint-6000"
+)
 
-
-
+# Reward model
 reward_name = "OpenAssistant/reward-model-deberta-v3-large-v2"
-reward_model = AutoModelForSequenceClassification.from_pretrained(reward_name).to("cuda")
+reward_model = AutoModelForSequenceClassification.from_pretrained(
+    reward_name,
+    device_map="auto"
+)
 
+# Dataset formatting
 dataset = load_dataset("tatsu-lab/alpaca", split="train")
-# Format the query using a ternary operator
+
 def format_query(example):
-    # 1. Always start with the instruction
     query = f"### Instruction:\n{example['instruction']}\n\n"
 
-    # 2. Only add the input section if it's not empty
     if example.get("input") and example["input"].strip():
         query += f"### Input:\n{example['input']}\n\n"
 
-    # 3. Always end with the response header
     query += "### Response:"
 
     return {"query": query}
 
-# Apply the formatting
 dataset = dataset.map(format_query, batched=False)
 
-
-
+# GRPO Training
 trainer = GRPOTrainer(
     model=model,
-    args=GRPOConfig(use_vllm=True,vllm_mode="colocate"),
+    args=GRPOConfig(
+        use_vllm=True,
+        vllm_mode="colocate"
+    ),
     reward_funcs=reward_model,
     train_dataset=dataset,
 )
