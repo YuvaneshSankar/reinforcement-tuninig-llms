@@ -17,7 +17,7 @@ model = PeftModel.from_pretrained(
 )
 
 # Reward model
-reward_name = "OpenAssistant/reward-model-deberta-v3-large-v2"
+reward_name = "Skywork/Skywork-Reward-V2-Qwen3-0.6B"
 reward_model = AutoModelForSequenceClassification.from_pretrained(
     reward_name,
     device_map="auto"
