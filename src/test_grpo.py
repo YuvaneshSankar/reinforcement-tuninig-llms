@@ -25,19 +25,19 @@ reward_model = AutoModelForSequenceClassification.from_pretrained(
 )
 
 # Dataset formatting
-dataset = load_dataset("tatsu-lab/alpaca", split="train")
+dataset = load_dataset("Skywork/Skywork-OR1-RL-Data", split="train")
 
-def format_query(example):
-    query = f"### Instruction:\n{example['instruction']}\n\n"
+# def format_query(example):
+#     query = f"### Instruction:\n{example['instruction']}\n\n"
 
-    if example.get("input") and example["input"].strip():
-        query += f"### Input:\n{example['input']}\n\n"
+#     if example.get("input") and example["input"].strip():
+#         query += f"### Input:\n{example['input']}\n\n"
 
-    query += "### Response:"
+#     query += "### Response:"
 
-    return {"prompt": query}
+#     return {"prompt": query}
 
-dataset = dataset.map(format_query, batched=False)
+# dataset = dataset.map(format_query, batched=False)
 
 # GRPO Training
 trainer = GRPOTrainer(
