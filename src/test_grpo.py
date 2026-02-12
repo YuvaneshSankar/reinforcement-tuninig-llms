@@ -60,3 +60,29 @@ trainer = GRPOTrainer(
 )
 
 trainer.train()
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+history = pd.DataFrame(trainer.state.log_history)
+
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+if 'loss' in history.columns:
+    axes[0].plot(history['step'], history['loss'], label='Train Loss', color='blue')
+    axes[0].set_title('Training Loss')
+    axes[0].set_xlabel('Steps')
+
+if 'reward' in history.columns:
+    axes[1].plot(history['step'], history['reward'], label='Reward', color='green')
+    axes[1].set_title('Mean Reward')
+    axes[1].set_xlabel('Steps')
+
+if 'kl' in history.columns:
+    axes[2].plot(history['step'], history['kl'], label='KL Div', color='red')
+    axes[2].set_title('KL Divergence')
+    axes[2].set_xlabel('Steps')
+
+plt.tight_layout()
+plt.savefig('training_metrics.png')
+print("Graphs saved to training_metrics.png")
