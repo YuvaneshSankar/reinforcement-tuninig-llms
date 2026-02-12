@@ -13,7 +13,8 @@ base_model = AutoModelForCausalLM.from_pretrained(
 # Load your PEFT adapter checkpoint
 model = PeftModel.from_pretrained(
     base_model,
-    "Yuvanesh123/grpo_test_checkpoint-6000"
+    "Yuvanesh123/grpo_test_checkpoint-6000",
+    is_trainable=True
 )
 
 # Reward model
