@@ -27,17 +27,12 @@ reward_model = AutoModelForSequenceClassification.from_pretrained(
 # Dataset formatting
 dataset = load_dataset("openai/gsm8k", "main", split="train")
 
-# def format_query(example):
-#     query = f"### Instruction:\n{example['instruction']}\n\n"
+def format_query(example):
+    query = f"### Question:\n{example['question']}\n\n"
 
-#     if example.get("input") and example["input"].strip():
-#         query += f"### Input:\n{example['input']}\n\n"
+    return {"prompt": query}
 
-#     query += "### Response:"
-
-#     return {"prompt": query}
-
-# dataset = dataset.map(format_query, batched=False)
+dataset = dataset.map(format_query, batched=False)
 
 # GRPO Training
 trainer = GRPOTrainer(
