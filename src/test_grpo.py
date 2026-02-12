@@ -25,7 +25,7 @@ reward_model = AutoModelForSequenceClassification.from_pretrained(
 )
 
 # Dataset formatting
-dataset = load_dataset("openai/gsm8k", "main")
+dataset = load_dataset("openai/gsm8k", "main", split="train")
 
 # def format_query(example):
 #     query = f"### Instruction:\n{example['instruction']}\n\n"
